@@ -1,0 +1,226 @@
+package com.jbascur.springboot.reactor.app;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.management.RuntimeErrorException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import com.jbascur.springboot.reactor.app.models.Comentarios;
+import com.jbascur.springboot.reactor.app.models.Usuario;
+import com.jbascur.springboot.reactor.app.models.UsuarioComentarios;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@SpringBootApplication
+public class SpringBootReactorApplication implements CommandLineRunner{
+
+	private static final Logger log = LoggerFactory.getLogger(SpringBootReactorApplication.class);
+	
+	public static void main(String[] args) {
+		SpringApplication.run(SpringBootReactorApplication.class, args);
+	}
+
+	@Override
+	public void run(String... args) throws Exception {
+		
+		ejemploZipWithRangos();
+		
+	}
+	
+	public void ejemploInterval() {
+		
+		Flux<Integer> rango = Flux.range(1, 12);
+		Flux<Long> retraso = Flux.interval(Duration.ofSeconds(1));
+		
+		rango.zipWith(retraso, (ra,re) -> ra)
+		.doOnNext(i -> log.info(i.toString()))
+		.blockLast();
+	}
+	
+	
+	public void ejemploZipWithRangos() {
+		
+		Flux<Integer> rangos = Flux.range(0, 4);
+		Flux.just(1,2,3,4)
+			.map(i -> (i*2))
+			.zipWith(rangos, (uno, dos) -> {
+				return String.format("Primer Flux: %d, Segundo Flux: %d", uno, dos);
+			})
+			.subscribe(texto -> log.info(texto));
+	}
+	
+	public void ejemploUsuarioComentariosZipWithForma2() {
+		
+		Mono<Usuario> usuarioMono = Mono.fromCallable(() -> new Usuario("John", "Doe"));
+		
+		Mono<Comentarios> comentariosUsuarioMono = Mono.fromCallable(() -> {
+			Comentarios comentarios = new Comentarios();
+			comentarios.addComentario("Hola John como estas");
+			comentarios.addComentario("Mañana voy a la playa");
+			comentarios.addComentario("Estoy en el curso de Spring");
+			
+			return comentarios;
+		});
+		
+		Mono<UsuarioComentarios> usuarioConComentarios = usuarioMono
+				.zipWith(comentariosUsuarioMono)
+				.map(tupla -> {
+					Usuario u = tupla.getT1();
+					Comentarios c = tupla.getT2();
+					return new UsuarioComentarios(u, c);
+				});
+		
+		usuarioConComentarios.subscribe(uc -> log.info(uc.toString()));
+	}
+	
+	public void ejemploUsuarioComentariosZipWith() {
+		
+		Mono<Usuario> usuarioMono = Mono.fromCallable(() -> new Usuario("John", "Doe"));
+		
+		Mono<Comentarios> comentariosUsuarioMono = Mono.fromCallable(() -> {
+			Comentarios comentarios = new Comentarios();
+			comentarios.addComentario("Hola John como estas");
+			comentarios.addComentario("Mañana voy a la playa");
+			comentarios.addComentario("Estoy en el curso de Spring");
+			
+			return comentarios;
+		});
+		
+		Mono<UsuarioComentarios> usuarioConComentarios = usuarioMono
+				.zipWith(comentariosUsuarioMono, 
+						(usuario, comentariosUsuario) -> new UsuarioComentarios(usuario, comentariosUsuario));
+		
+		usuarioConComentarios.subscribe(uc -> log.info(uc.toString()));
+	}
+	
+	public void ejemploUsuarioComentariosFlatMap() {
+		
+		Mono<Usuario> usuarioMono = Mono.fromCallable(() -> new Usuario("John", "Doe"));
+		
+		Mono<Comentarios> comentariosUsuarioMono = Mono.fromCallable(() -> {
+			Comentarios comentarios = new Comentarios();
+			comentarios.addComentario("Hola John como estas");
+			comentarios.addComentario("Mañana voy a la playa");
+			comentarios.addComentario("Estoy en el curso de Spring");
+			
+			return comentarios;
+		});
+		
+		usuarioMono.flatMap(u -> comentariosUsuarioMono.map(c -> new UsuarioComentarios(u, c)))
+			.subscribe(uc -> log.info(uc.toString()));
+	}
+	
+	public void ejemploCollectList() throws Exception {
+		
+		List<Usuario> usuariosList = new ArrayList<>();
+		usuariosList.add(new Usuario("Pedro", "Perez"));
+		usuariosList.add(new Usuario("Juan", "Jarri"));
+		usuariosList.add(new Usuario("Diego", "Dalton"));
+		usuariosList.add(new Usuario("Bruce", "Willis"));
+		usuariosList.add(new Usuario("Bruce", "Lee"));
+			
+
+		Flux.fromIterable(usuariosList)
+			.collectList()
+			.subscribe(lista -> {
+				lista.forEach(item -> log.info(item.toString()));
+			});
+	}
+	
+	public void ejemploToString() throws Exception {
+		
+		List<Usuario> usuariosList = new ArrayList<>();
+		usuariosList.add(new Usuario("Pedro", "Perez"));
+		usuariosList.add(new Usuario("Juan", "Jarri"));
+		usuariosList.add(new Usuario("Diego", "Dalton"));
+		usuariosList.add(new Usuario("Bruce", "Willis"));
+		usuariosList.add(new Usuario("Bruce", "Lee"));
+			
+
+		Flux.fromIterable(usuariosList)
+			.map(usuario -> usuario.getNombre().toUpperCase().concat(" ").concat(usuario.getApellido().toUpperCase()))
+			.flatMap(nombre -> {
+				if(nombre.contains("bruce".toUpperCase())) {
+					return Mono.just(nombre);
+				}
+				return Mono.empty();
+			})
+			.map(nombre -> {
+				return nombre.toLowerCase();
+				})
+			.subscribe(u -> log.info(u.toString()));
+	}
+	
+	public void ejemploFlatMap() throws Exception {
+		
+		List<String> usuariosList = new ArrayList<>();
+		usuariosList.add("Pedro Perez");
+		usuariosList.add("Juan Jarri");
+		usuariosList.add("Diego Dalton");
+		usuariosList.add("Bruce Willis");
+		usuariosList.add("Bruce Lee");
+			
+
+		Flux.fromIterable(usuariosList)
+			.map(nombre -> new Usuario(nombre.split(" ")[0].toUpperCase(), nombre.split(" ")[1].toUpperCase()))
+			.flatMap(usuario -> {
+				if(usuario.getNombre().equalsIgnoreCase("bruce")) {
+					return Mono.just(usuario);
+				}
+				return Mono.empty();
+			})
+			.map(usuario -> {
+				String nombre = usuario.getNombre().toLowerCase();
+				usuario.setNombre(nombre);
+				return usuario;
+				})
+			.subscribe(u -> log.info(u.toString()));
+	}
+	
+	public void ejemploIterable() throws Exception {
+		
+		List<String> usuariosList = new ArrayList<>();
+		usuariosList.add("Pedro Perez");
+		usuariosList.add("Juan Jarri");
+		usuariosList.add("Diego Dalton");
+		usuariosList.add("Bruce Willis");
+		usuariosList.add("Bruce Lee");
+			
+
+		Flux<String> nombres = Flux.fromIterable(usuariosList); //Flux.just("Pedro Perez",  "Juan Jarri", "Diego Dalton", "Bruce Willis", "Bruce Lee");
+		
+		Flux<Usuario> usuarios = nombres.map(nombre -> new Usuario(nombre.split(" ")[0].toUpperCase(), nombre.split(" ")[1].toUpperCase()))
+				.filter(usuario -> usuario.getNombre().toLowerCase().equals("bruce") )
+				.doOnNext(usuario -> {
+					if(usuario == null) {
+						throw new RuntimeException("Nombres no pueden ir vacíos");
+					}
+					System.out.println(usuario.toString());
+					
+				})
+				.map(usuario -> {
+					String nombre = usuario.getNombre().toLowerCase();
+					usuario.setNombre(nombre);
+					return usuario;
+				});
+		
+		usuarios.subscribe(e -> log.info(e.toString()),
+				error -> log.error(error.getMessage()),
+				new Runnable() {
+					
+					@Override
+					public void run() {
+						log.info("Ha finalizado la ejecucion del observable");
+					}
+				});
+	}
+
+}

@@ -1,0 +1,9 @@
+package com.jbascur.springboot.reactor.app.models;
+
+import java.util.List;
+
+public class Comentarios {
+	
+	private List<String> comentarios;
+
+}

@@ -1,0 +1,5 @@
+package com.jbascur.springboot.reactor.app.models;
+
+public class Comentarios {
+
+}
